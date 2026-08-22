@@ -94,5 +94,40 @@ def geocode_suggestions(request):
 
 @api_view(["GET"])
 def health(request):
-    """Cheap liveness probe, also used to warm a cold serverless function."""
-    return Response({"status": "ok"})
+    """Liveness probe, also used to warm a cold serverless function.
+
+    ``?deep=1`` additionally reports whether each provider is reachable from
+    *this* environment, which is the only practical way to tell a missing
+    deployment variable apart from a provider outage. Never reveals the key --
+    only whether one is configured and how long it is.
+    """
+    if request.query_params.get("deep") not in {"1", "true", "yes"}:
+        return Response({"status": "ok"})
+
+    from django.conf import settings
+
+    key = getattr(settings, "ORS_API_KEY", "")
+    report = {
+        "status": "ok",
+        "ors_key_configured": bool(key),
+        "ors_key_length": len(key),
+        "providers": {},
+    }
+
+    service = get_routing_service()
+    report["geocoders"] = [g.name for g in service.geocoders]
+    report["routers"] = [r.name for r in service.routers]
+
+    for provider in {p.name: p for p in service.geocoders}.values():
+        checks = {}
+        for label, call in (
+            ("geocode", lambda p=provider: p.geocode("Dallas, Texas").label),
+            ("reverse", lambda p=provider: p.reverse(32.7767, -96.7970)),
+        ):
+            try:
+                checks[label] = {"ok": True, "result": call()}
+            except Exception as exc:  # noqa: BLE001 - a probe reports, never raises
+                checks[label] = {"ok": False, "error": str(exc)[:300]}
+        report["providers"][provider.name] = checks
+
+    return Response(report)

@@ -12,6 +12,7 @@ than sending all three points at once.
 from __future__ import annotations
 
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -21,6 +22,11 @@ from .routing import GeocodingError, RoutingError
 from .types import GeoPoint, RouteLeg
 
 BASE = "https://api.openrouteservice.org"
+
+
+def _redact(exc: Exception) -> str:
+    """Strip any api_key that leaked into an exception's URL."""
+    return re.sub(r"(api_key=)[^&\s]+", r"\1<redacted>", str(exc))
 #: Routing profile, used only when ORS is the routing fallback.
 #:
 #: driving-hgv is the semantically correct choice -- it honours bridge heights,
@@ -53,13 +59,14 @@ class OpenRouteServiceProvider:
         try:
             response = httpx.get(
                 f"{BASE}/{path}",
-                params={**params, "api_key": self.api_key},
+                params=params,
+                headers={"Authorization": self.api_key, "Accept": "application/json"},
                 timeout=TIMEOUT,
             )
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as exc:
-            raise RoutingError(f"OpenRouteService request failed: {exc}") from exc
+            raise RoutingError(f"OpenRouteService request failed: {_redact(exc)}") from exc
 
     def _post(self, path: str, body: dict) -> dict:
         try:
@@ -76,7 +83,7 @@ class OpenRouteServiceProvider:
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as exc:
-            raise RoutingError(f"OpenRouteService request failed: {exc}") from exc
+            raise RoutingError(f"OpenRouteService request failed: {_redact(exc)}") from exc
 
     # -- geocoding (Pelias) --------------------------------------------
 
@@ -124,17 +131,16 @@ class OpenRouteServiceProvider:
         if key in self._reverse_cache:
             return self._reverse_cache[key]
 
-        try:
-            payload = self._get(
-                "geocode/reverse",
-                {"point.lat": lat, "point.lon": lon, "size": 1, "layers": "locality,county"},
-            )
-            features = payload.get("features", [])
-            place = self._city_state(features[0]) if features else ""
-        except RoutingError:
-            place = ""
+        # Deliberately lets RoutingError propagate: a failure here must reach the
+        # RoutingService so it can fall through to the next provider. Swallowing
+        # it and returning coordinates hides an outage behind plausible output.
+        payload = self._get(
+            "geocode/reverse",
+            {"point.lat": lat, "point.lon": lon, "size": 1, "layers": "locality,county"},
+        )
+        features = payload.get("features", [])
+        place = self._city_state(features[0]) if features else f"{lat:.3f}, {lon:.3f}"
 
-        place = place or f"{lat:.3f}, {lon:.3f}"
         self._reverse_cache[key] = place
         return place
 
