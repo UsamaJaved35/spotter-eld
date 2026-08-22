@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* ---------------------------------------------------------------------------
+   Dispatch console: a night-shift instrument panel holding a paper DOT form.
+   The whole design rests on that contrast, so the console tokens run dark and
+   desaturated while the log sheet keeps a warm, printed paper palette.
+--------------------------------------------------------------------------- */
+
+@theme {
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* Console surfaces */
+  --color-console-void: #07090c;
+  --color-console-deep: #0b0f14;
+  --color-console-panel: #111820;
+  --color-console-raised: #17202b;
+  --color-console-line: #1f2b38;
+  --color-console-edge: #2b3a4a;
+
+  /* Console text */
+  --color-console-bright: #e8eef5;
+  --color-console-text: #a8b8c8;
+  --color-console-dim: #64798d;
+
+  /* Instrument accents: literal truck-panel colours */
+  --color-amber: #ffb020;
+  --color-amber-dim: #8a5f11;
+  --color-signal: #35d07f;
+  --color-warn: #ff5c48;
+  --color-sleeper: #7c8cff;
+
+  /* Duty statuses, used on both the ribbon and the paper grid */
+  --color-duty-off: #5b6b7c;
+  --color-duty-sb: #7c8cff;
+  --color-duty-d: #ffb020;
+  --color-duty-on: #35d07f;
+
+  /* Paper */
+  --color-paper: #f4efe3;
+  --color-paper-ink: #14110c;
+  --color-paper-rule: #9c9280;
+  --color-paper-shade: #e2dac9;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-console-void);
+    color: var(--color-console-text);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Faint engineering grid + a warm glow from the top left, so the ground
+     reads as a lit panel rather than flat black. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      radial-gradient(
+        900px 520px at 12% -8%,
+        color-mix(in oklab, var(--color-amber) 9%, transparent),
+        transparent 68%
+      ),
+      linear-gradient(var(--color-console-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--color-console-line) 1px, transparent 1px);
+    background-size: 100% 100%, 68px 68px, 68px 68px;
+    opacity: 0.5;
+  }
+
+  /* Film grain, so large dark areas are never dead flat. */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.16;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-amber) 40%, transparent);
+    color: var(--color-console-bright);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* Stencilled section labels, as on real equipment panels. */
+  .stencil {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-console-dim);
+  }
+
+  .panel {
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--color-console-raised) 60%, transparent), transparent 40%),
+      var(--color-console-panel);
+    border: 1px solid var(--color-console-line);
+  }
+
+  /* Cut corner: a small chamfer that reads as machined metal. */
+  .chamfer {
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+  }
+
+  .field {
+    width: 100%;
+    background: var(--color-console-void);
+    border: 1px solid var(--color-console-line);
+    color: var(--color-console-bright);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    padding: 0.6rem 0.75rem;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+  }
+
+  .field::placeholder {
+    color: color-mix(in oklab, var(--color-console-dim) 75%, transparent);
+  }
+
+  .field:focus {
+    outline: none;
+    border-color: var(--color-amber);
+    box-shadow: 0 0 0 1px var(--color-amber), 0 0 22px -6px var(--color-amber);
+  }
+
+  /* The paper log sheet: warm stock, printed rules, a real shadow against
+     the dark console. */
+  .paper {
+    background-color: var(--color-paper);
+    color: var(--color-paper-ink);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, #fff 60%, transparent) inset,
+      0 30px 60px -24px #000,
+      0 4px 14px -6px #000;
+  }
+}
+
+@layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Staggered entrance for result panels. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .rise {
+    animation: rise 520ms cubic-bezier(0.2, 0.7, 0.25, 1) both;
+  }
+
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Leaflet needs to sit above the fixed background layers. */
+.leaflet-container {
+  background: var(--color-console-deep);
+  font-family: var(--font-mono);
+}
+
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--color-console-void) 82%, transparent) !important;
+  color: var(--color-console-dim) !important;
+  font-size: 10px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-console-text) !important;
+}
+
+.leaflet-bar a {
+  background: var(--color-console-panel) !important;
+  color: var(--color-console-bright) !important;
+  border-color: var(--color-console-line) !important;
+}
+
+.leaflet-bar a:hover {
+  background: var(--color-console-raised) !important;
+}
+
+/* Range input: the native thumb is a blue capsule on every platform, which
+   fights the console palette. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--color-amber);
+  border: 2px solid var(--color-console-void);
+  box-shadow: 0 0 12px -2px var(--color-amber);
+  cursor: grab;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--color-amber);
+  border: 2px solid var(--color-console-void);
+  cursor: grab;
+}
+
+/* Native pickers render dark-on-dark otherwise. */
+input[type="datetime-local"],
+input[type="number"] {
+  color-scheme: dark;
+}
