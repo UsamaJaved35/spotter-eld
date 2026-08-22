@@ -74,7 +74,7 @@ out degrades the app instead of breaking it.
 
 | Role | Preferred | Why |
 |---|---|---|
-| Geocoding, autocomplete, reverse | **OpenRouteService** (falls back to Nominatim) | Resolves rural coordinates to a real town — `Rolla, MO` where Nominatim gives `Crawford County, MO` — which matters because § 395.8 wants a city and state at every duty change. No 1-req/s ceiling either, so a trip's stop names resolve concurrently: 4.8 s per plan instead of 8.6 s. |
+| Geocoding, autocomplete, reverse | **OpenRouteService** (falls back to Nominatim) | Throughput, not name quality. § 395.8 needs a city and state at every duty change, and a long trip has 15–20 stops to name; ORS resolves them concurrently where Nominatim's policy caps you at 1 req/s (0.7 s vs 6.3 s for six lookups; 4.8 s vs 8.6 s for a whole plan). Nominatim also asks that you not point autocomplete traffic at it. On name *quality* the two are close to a wash — they agreed on 8 of 10 rural corridor points, and both fall back to a county where no town exists. |
 | Routing | **OSRM** (falls back to OpenRouteService) | ORS's `driving-hgv` profile is badly conservative. Measured Dallas → Oklahoma City: **35.5 mph** average, against OSRM's **55.1** and ORS's own `driving-car` at **60.5**. About 55 mph is the realistic planning figure for a property-carrying CMV. |
 
 That routing choice is deliberate and worth stating plainly: `driving-hgv` is the
@@ -196,3 +196,13 @@ reads `= 24.00`, and the PDF downloads.
 
 Split sleeper-berth (7/3 and 8/2) provisions, the adverse-driving and
 short-haul exceptions, the 60-hour/7-day cycle, and driver accounts.
+
+## Checking the OpenRouteService integration
+
+```bash
+cd backend
+.venv/bin/python scripts/check_ors.py
+```
+
+Prints what the app asks OpenRouteService for, what comes back, and the
+measurement behind routing with OSRM instead. Never prints your API key.
