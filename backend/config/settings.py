@@ -47,7 +47,14 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# There is deliberately no CsrfViewMiddleware. CSRF defends cookie-authenticated
+# requests; this API has no authentication, no sessions and sets no cookies, so
+# there is no ambient authority for a forged request to ride on. Adding the
+# middleware here would only make the frontend fetch and forward a token to
+# protect nothing. Revisit the moment any per-user state is introduced.
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -89,6 +96,27 @@ USE_TZ = False
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# --- Transport security ----------------------------------------------
+# Vercel terminates TLS and forwards over HTTP, so Django must be told to trust
+# the forwarded protocol header. Without this, SECURE_SSL_REDIRECT would see
+# every request as insecure and redirect forever.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+X_FRAME_OPTIONS = "DENY"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+
+# Gate on Vercel's own marker rather than `not DEBUG`. DEBUG defaults to false,
+# so keying off it would make `manage.py runserver` redirect every local http
+# request to https and refuse to serve anything.
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+
+if ON_VERCEL:
+    SECURE_SSL_REDIRECT = True
+    # One year. No includeSubDomains or preload: this deploys onto a shared
+    # *.vercel.app parent that is not ours to make claims about.
+    SECURE_HSTS_SECONDS = 31_536_000
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
