@@ -11,6 +11,7 @@ than sending all three points at once.
 
 from __future__ import annotations
 
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -20,7 +21,19 @@ from .routing import GeocodingError, RoutingError
 from .types import GeoPoint, RouteLeg
 
 BASE = "https://api.openrouteservice.org"
-PROFILE = "driving-hgv"  # property-carrying CMV
+#: Routing profile, used only when ORS is the routing fallback.
+#:
+#: driving-hgv is the semantically correct choice -- it honours bridge heights,
+#: weight limits and truck-prohibited roads -- but its speeds are badly
+#: conservative. Measured on Dallas -> Oklahoma City: 35.5 mph average, against
+#: OSRM's 55.1 and ORS's own driving-car at 60.5. Roughly 55 mph is the
+#: realistic planning figure for a property-carrying CMV.
+#:
+#: Every hours-of-service clock is driven by elapsed *time*, so a 40% slow bias
+#: would inflate rest stops and log-sheet counts -- a much worse error for this
+#: app than occasionally routing down a road a truck should avoid. Default to
+#: the accurate duration; set ORS_PROFILE=driving-hgv to prefer truck legality.
+PROFILE = os.environ.get("ORS_PROFILE", "driving-car").strip() or "driving-car"
 TIMEOUT = httpx.Timeout(25.0, connect=10.0)
 MAX_REVERSE_WORKERS = 8
 
@@ -142,6 +155,10 @@ class OpenRouteServiceProvider:
                 "coordinates": [[start.lon, start.lat], [end.lon, end.lat]],
                 "instructions": True,
                 "units": "m",
+                # ORS geocodes a city to its centroid, which is often further
+                # than the default 350 m snapping radius from any road and comes
+                # back as error 2010. -1 lifts the limit.
+                "radiuses": [-1, -1],
             },
         )
         features = payload.get("features", [])

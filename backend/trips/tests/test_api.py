@@ -49,8 +49,8 @@ def stub_routing(monkeypatch):
     from trips.services import routing
 
     provider = FakeProvider()
-    monkeypatch.setattr(routing, "get_provider", lambda: provider)
-    monkeypatch.setattr(routing, "get_fallback_provider", lambda: provider)
+    # One fake stands in for both roles: geocoding and routing.
+    monkeypatch.setattr(routing, "_providers", lambda: ([provider], [provider]))
     return provider
 
 

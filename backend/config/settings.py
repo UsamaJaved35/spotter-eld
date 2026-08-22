@@ -61,11 +61,20 @@ TEMPLATES = [
     }
 ]
 
+# dj_database_url.config() honours DATABASE_URL even when it is set to an empty
+# string, returning {} and leaving Django without an ENGINE. Treat blank as
+# absent so a placeholder line in .env (or an empty Vercel variable) still falls
+# back to SQLite instead of failing at the first query.
+_database_url = os.environ.get("DATABASE_URL", "").strip()
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-        conn_health_checks=True,
+    "default": (
+        dj_database_url.parse(_database_url, conn_max_age=600, conn_health_checks=True)
+        if _database_url
+        else {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
     )
 }
 

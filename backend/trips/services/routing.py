@@ -44,82 +44,99 @@ class RoutingProvider(Protocol):
     def route(self, start: GeoPoint, end: GeoPoint) -> RouteLeg: ...
 
 
-def get_provider() -> RoutingProvider:
-    """The configured primary provider: OpenRouteService if keyed, else OSRM."""
+def _providers() -> tuple[list, list]:
+    """Return ``(geocoders, routers)``, each in preference order.
+
+    Geocoding and routing are resolved separately because the best provider
+    differs by role:
+
+    * **Geocoding** prefers OpenRouteService. It resolves rural coordinates to a
+      real town ("Steelville, MO" where Nominatim gives "Crawford County, MO"),
+      which matters because 395.8 wants a city and state at every duty change,
+      and it has no one-request-per-second ceiling, so a trip's stop names
+      resolve concurrently instead of taking a second each.
+
+    * **Routing** prefers OSRM. ORS's driving-hgv profile is heavily
+      conservative: on Dallas -> Oklahoma City it returns 211.7 mi in 5.96 h,
+      a 35.5 mph average, against OSRM's 55.1 mph and ORS's own driving-car at
+      60.5 mph. Around 55 mph is the realistic planning figure for a
+      property-carrying CMV, and since every hours-of-service clock is driven by
+      elapsed driving time, a 40% slow bias would inflate the rest count and the
+      number of log sheets.
+    """
     from .ors import OpenRouteServiceProvider
     from .osrm import OsrmProvider
 
+    osrm = OsrmProvider()
     if getattr(settings, "ORS_API_KEY", ""):
-        return OpenRouteServiceProvider(settings.ORS_API_KEY)
-    return OsrmProvider()
+        ors = OpenRouteServiceProvider(settings.ORS_API_KEY)
+        return [ors, osrm], [osrm, ors]
+    return [osrm], [osrm]
 
 
-def get_fallback_provider() -> RoutingProvider:
-    from .osrm import OsrmProvider
+class RoutingService:
+    """Fronts the providers, falling through the preference order on failure.
 
-    return OsrmProvider()
-
-
-class FallbackProvider:
-    """Tries the primary provider, then the keyless one.
-
-    A hosted demo should degrade rather than fail: if the OpenRouteService quota
-    is exhausted mid-assessment, routing quietly continues on OSRM.
+    A hosted demo should degrade rather than break: if the OpenRouteService
+    quota runs out mid-assessment, geocoding quietly continues on Nominatim.
     """
 
-    name = "fallback"
-
-    def __init__(self, primary: RoutingProvider, secondary: RoutingProvider):
-        self.primary = primary
-        self.secondary = secondary
+    def __init__(self, geocoders: list, routers: list):
+        self.geocoders = geocoders
+        self.routers = routers
+        self.used_geocoder: str | None = None
+        self.used_router: str | None = None
 
     @property
     def active(self) -> str:
-        return self._used or self.primary.name
+        return self.used_router or self.routers[0].name
 
-    def __post_init__(self):  # pragma: no cover - dataclass parity
-        pass
+    @property
+    def geocoder_name(self) -> str:
+        return self.used_geocoder or self.geocoders[0].name
 
-    _used: str | None = None
+    def _try(self, providers: list, method: str, *args):
+        last: Exception | None = None
+        for provider in providers:
+            try:
+                result = getattr(provider, method)(*args)
+            except RoutingError as exc:
+                last = exc
+                logger.warning("%s.%s failed: %s", provider.name, method, exc)
+                continue
+            return provider.name, result
+        raise last or RoutingError(f"No provider could handle {method}")
 
-    def _attempt(self, method: str, *args, **kwargs):
-        try:
-            result = getattr(self.primary, method)(*args, **kwargs)
-            self._used = self.primary.name
-            return result
-        except RoutingError as exc:
-            if self.primary is self.secondary:
-                raise
-            logger.warning(
-                "%s.%s failed (%s); falling back to %s",
-                self.primary.name,
-                method,
-                exc,
-                self.secondary.name,
-            )
-            result = getattr(self.secondary, method)(*args, **kwargs)
-            self._used = self.secondary.name
-            return result
+    # -- geocoding -----------------------------------------------------
 
     def geocode(self, query: str) -> GeoPoint:
-        return self._attempt("geocode", query)
+        name, result = self._try(self.geocoders, "geocode", query)
+        self.used_geocoder = name
+        return result
 
     def autocomplete(self, query: str, limit: int = 5) -> list[GeoPoint]:
-        return self._attempt("autocomplete", query, limit)
+        name, result = self._try(self.geocoders, "autocomplete", query, limit)
+        self.used_geocoder = name
+        return result
 
     def reverse(self, lat: float, lon: float) -> str:
-        return self._attempt("reverse", lat, lon)
+        name, result = self._try(self.geocoders, "reverse", lat, lon)
+        self.used_geocoder = name
+        return result
 
     def reverse_many(self, points: list[tuple[float, float]]) -> list[str]:
-        return self._attempt("reverse_many", points)
+        name, result = self._try(self.geocoders, "reverse_many", points)
+        self.used_geocoder = name
+        return result
+
+    # -- routing -------------------------------------------------------
 
     def route(self, start: GeoPoint, end: GeoPoint) -> RouteLeg:
-        return self._attempt("route", start, end)
+        name, result = self._try(self.routers, "route", start, end)
+        self.used_router = name
+        return result
 
 
-def get_routing_service() -> FallbackProvider:
-    primary = get_provider()
-    secondary = get_fallback_provider()
-    if primary.name == secondary.name:
-        secondary = primary
-    return FallbackProvider(primary, secondary)
+def get_routing_service() -> RoutingService:
+    geocoders, routers = _providers()
+    return RoutingService(geocoders, routers)

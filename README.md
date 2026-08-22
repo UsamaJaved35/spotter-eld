@@ -68,17 +68,28 @@ URL**, requests are same-origin, and no API key ever reaches the browser.
 
 ### Routing providers
 
-| | OpenRouteService | OSRM + Nominatim |
+Geocoding and routing resolve **independently**, because the better provider
+differs by role. Each falls through to the other on failure, so a quota running
+out degrades the app instead of breaking it.
+
+| Role | Preferred | Why |
 |---|---|---|
-| API key | required (free, no card) | none |
-| Used when | `ORS_API_KEY` is set | otherwise, and as fallback |
-| Extras | address autocomplete, HGV profile, concurrent reverse geocoding | throttled to 1 req/s per Nominatim's policy |
+| Geocoding, autocomplete, reverse | **OpenRouteService** (falls back to Nominatim) | Resolves rural coordinates to a real town — `Rolla, MO` where Nominatim gives `Crawford County, MO` — which matters because § 395.8 wants a city and state at every duty change. No 1-req/s ceiling either, so a trip's stop names resolve concurrently: 4.8 s per plan instead of 8.6 s. |
+| Routing | **OSRM** (falls back to OpenRouteService) | ORS's `driving-hgv` profile is badly conservative. Measured Dallas → Oklahoma City: **35.5 mph** average, against OSRM's **55.1** and ORS's own `driving-car` at **60.5**. About 55 mph is the realistic planning figure for a property-carrying CMV. |
+
+That routing choice is deliberate and worth stating plainly: `driving-hgv` is the
+*semantically* correct profile, since it honours bridge heights, weight limits
+and truck-prohibited roads. But every hours-of-service clock is driven by
+elapsed **time**, so a 40 % slow bias would inflate rest stops and the number of
+log sheets — a far worse error for this app than occasionally routing down a
+road a truck should avoid. Set `ORS_PROFILE=driving-hgv` to prefer truck
+legality over duration accuracy.
 
 Each leg is routed separately. That is needed to place the pickup correctly and
 keeps every request under OpenRouteService's hard 6,000 km per-route cap.
 
-The app is fully functional with **no key at all**. Adding one makes it faster
-and enables truck-profile routing.
+The app is fully functional with **no key at all** — it just uses OSRM and
+Nominatim for both roles.
 
 ---
 
@@ -147,6 +158,7 @@ Locally the app falls back to SQLite when that variable is absent.
   | `DEBUG` | `false` |
   | `ALLOWED_HOSTS` | `.vercel.app` |
   | `ORS_API_KEY` | optional — from openrouteservice.org |
+  | `ORS_PROFILE` | optional — `driving-car` (default) or `driving-hgv` |
 
 - Deploy, then note the URL, e.g. `https://spotter-eld-api.vercel.app`
 
