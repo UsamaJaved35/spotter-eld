@@ -95,6 +95,11 @@ def build_trip(request: TripRequest) -> dict:
         },
         "route": {
             "provider": service.active,
+            # Which provider actually served each role. Worth surfacing: a
+            # deployment missing ORS_API_KEY silently falls back to Nominatim,
+            # which blocks datacenter IPs and leaves Remarks showing raw
+            # coordinates instead of the city and state 395.8 requires.
+            "geocoder": service.geocoder_name,
             "legs": [
                 _leg_payload(to_pickup, "Current location to pickup"),
                 _leg_payload(to_dropoff, "Pickup to dropoff"),

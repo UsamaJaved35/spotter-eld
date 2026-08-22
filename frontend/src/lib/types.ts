@@ -106,7 +106,7 @@ export interface Trip {
   created_at: string;
   inputs: TripInputs;
   places: { current: Place; pickup: Place; dropoff: Place };
-  route: { provider: string; legs: RouteLegPayload[] };
+  route: { provider: string; geocoder?: string; legs: RouteLegPayload[] };
   segments: Segment[];
   stops: Stop[];
   daily_logs: DailyLog[];

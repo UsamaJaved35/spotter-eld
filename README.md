@@ -88,8 +88,16 @@ legality over duration accuracy.
 Each leg is routed separately. That is needed to place the pickup correctly and
 keeps every request under OpenRouteService's hard 6,000 km per-route cap.
 
-The app is fully functional with **no key at all** — it just uses OSRM and
-Nominatim for both roles.
+Locally the app is fully functional with **no key at all**, falling back to
+OSRM and Nominatim for both roles.
+
+**In production the key is effectively required.** Nominatim blocks or throttles
+datacenter IPs, so on Vercel its reverse geocoding fails and Remarks fall back to
+raw coordinates (`35.473, -97.516`) instead of the city and state § 395.8 asks
+for. Forward geocoding degrades too. If `ORS_API_KEY` is missing from the
+deployed environment the app still returns a valid, correct plan — but the log
+sheets lose their place names. The Route panel names the provider that served
+each role, so this is visible rather than silent.
 
 ---
 

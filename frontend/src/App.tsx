@@ -138,7 +138,10 @@ export default function App() {
 
               <section className="rise grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" style={{ animationDelay: "80ms" }}>
                 <div className="panel chamfer overflow-hidden">
-                  <PanelHeader title="Route" note={`${trip.route.legs.length} legs · via ${trip.route.provider}`} />
+                  <PanelHeader
+                    title="Route"
+                    note={`${trip.route.legs.length} legs · routed by ${trip.route.provider}${trip.route.geocoder ? ` · geocoded by ${trip.route.geocoder}` : ""}`}
+                  />
                   <div className="h-[440px] w-full">
                     <RouteMap trip={trip} />
                   </div>
