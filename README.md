@@ -149,7 +149,11 @@ Locally the app falls back to SQLite when that variable is absent.
 **3. Backend project**
 
 - New Project → import the repo → set **Root Directory** to `backend`
-- Vercel auto-detects Django from `manage.py` and runs `collectstatic` itself
+- Vercel auto-detects Django from `manage.py` and runs `collectstatic` itself.
+  Confirm **Framework Preset** shows *Django*, not *Other*. There is deliberately
+  no `backend/vercel.json`: a `functions` block gets validated against the legacy
+  `api/` directory convention and fails the build with
+  *"doesn't match any Serverless Functions inside the `api` directory"*
 - Environment variables:
 
   | Name | Value |
