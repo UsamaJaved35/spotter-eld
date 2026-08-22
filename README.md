@@ -88,16 +88,18 @@ legality over duration accuracy.
 Each leg is routed separately. That is needed to place the pickup correctly and
 keeps every request under OpenRouteService's hard 6,000 km per-route cap.
 
-Locally the app is fully functional with **no key at all**, falling back to
-OSRM and Nominatim for both roles.
+The app is fully functional with **no key at all**, in production as well as
+locally — it falls back to OSRM and Nominatim for both roles, and Remarks still
+get proper city and state names. The key buys throughput and better
+autocomplete, not correctness.
 
-**In production the key is effectively required.** Nominatim blocks or throttles
-datacenter IPs, so on Vercel its reverse geocoding fails and Remarks fall back to
-raw coordinates (`35.473, -97.516`) instead of the city and state § 395.8 asks
-for. Forward geocoding degrades too. If `ORS_API_KEY` is missing from the
-deployed environment the app still returns a valid, correct plan — but the log
-sheets lose their place names. The Route panel names the provider that served
-each role, so this is visible rather than silent.
+The Route panel names the provider that served each role
+(`routed by osrm · geocoded by openrouteservice`), and `/api/health/?deep=1`
+probes each provider from inside the deployment and reports what failed. That
+endpoint reports whether a key is configured and its **length**, never its value
+— which is how a truncated key pasted into a dashboard was caught: 119
+characters deployed against 120 locally, the trailing base64 `=` lost, every
+request coming back 403.
 
 ---
 
