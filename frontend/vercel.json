@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE-WITH-BACKEND.vercel.app/api/:path*"
+      "destination": "https://spotter-eld-backend-sage.vercel.app/api/:path*"
     },
     {
       "source": "/((?!assets/).*)",
