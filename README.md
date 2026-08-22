@@ -149,11 +149,11 @@ Locally the app falls back to SQLite when that variable is absent.
 **3. Backend project**
 
 - New Project → import the repo → set **Root Directory** to `backend`
-- Vercel auto-detects Django from `manage.py` and runs `collectstatic` itself.
-  Confirm **Framework Preset** shows *Django*, not *Other*. There is deliberately
-  no `backend/vercel.json`: a `functions` block gets validated against the legacy
-  `api/` directory convention and fails the build with
-  *"doesn't match any Serverless Functions inside the `api` directory"*
+- Routing goes through `backend/api/index.py`, which exports the Django WSGI
+  callable, with `backend/vercel.json` rewriting every path to it. This uses
+  Vercel's explicit file-based `api/` convention rather than relying on Django
+  framework auto-detection, which did not engage for this project and left the
+  deployment with no routable function at all
 - Environment variables:
 
   | Name | Value |
