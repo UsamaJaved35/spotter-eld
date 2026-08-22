@@ -94,7 +94,7 @@ export default function App() {
     <div className="relative z-10 min-h-screen">
       <Masthead trip={trip} />
 
-      <div className="mx-auto grid max-w-[1680px] gap-6 px-4 pb-20 lg:grid-cols-[350px_minmax(0,1fr)] lg:px-6">
+      <div className="mx-auto grid max-w-[1680px] grid-cols-[minmax(0,1fr)] gap-6 px-4 pb-20 lg:grid-cols-[350px_minmax(0,1fr)] lg:px-6">
         {/* ---------------- control rail ---------------- */}
         <aside className="lg:sticky lg:top-6 lg:self-start">
           <div className="panel chamfer p-5">
@@ -136,7 +136,7 @@ export default function App() {
                 <Summary trip={trip} />
               </section>
 
-              <section className="rise grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" style={{ animationDelay: "80ms" }}>
+              <section className="rise grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" style={{ animationDelay: "80ms" }}>
                 <div className="panel chamfer overflow-hidden">
                   <PanelHeader title="Route" note={`${trip.route.legs.length} legs · via ${trip.route.provider}`} />
                   <div className="h-[440px] w-full">
@@ -153,7 +153,7 @@ export default function App() {
                 </div>
               </section>
 
-              <section className="rise grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]" style={{ animationDelay: "160ms" }}>
+              <section className="rise grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[380px_minmax(0,1fr)]" style={{ animationDelay: "160ms" }}>
                 <div className="panel chamfer flex max-h-[560px] flex-col overflow-hidden">
                   <PanelHeader title="Duty timeline" note="every status change" />
                   <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
